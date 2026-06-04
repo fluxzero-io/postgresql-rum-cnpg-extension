@@ -1,0 +1,70 @@
+name: Build and publish
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: build-and-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Smoke test and publish image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build extension image and run smoke test
+        run: ./scripts/smoke-test.sh versions/pg18-bullseye.env
+
+      - name: Compute image tags
+        id: tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}"
+          IMAGE_REPOSITORY="${repository}" ./scripts/image-tags.sh versions/pg18-bullseye.env github-output
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish extension image
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/pg18-bullseye
+          file: docker/pg18-bullseye/Dockerfile
+          platforms: linux/amd64
+          push: true
+          provenance: true
+          sbom: true
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.tags.outputs.immutable_tag }}
+          build-args: |
+            BASE_IMAGE=${{ steps.tags.outputs.base_image }}
+            PG_MAJOR=${{ steps.tags.outputs.pg_major }}
+            PG_VERSION=${{ steps.tags.outputs.pg_version }}
+            PG_DISTRO=${{ steps.tags.outputs.pg_distro }}
+            RUM_PACKAGE=${{ steps.tags.outputs.rum_package }}
+            RUM_PACKAGE_VERSION=${{ steps.tags.outputs.rum_package_version }}
+            RUM_PACKAGE_SHA256=${{ steps.tags.outputs.rum_package_sha256 }}

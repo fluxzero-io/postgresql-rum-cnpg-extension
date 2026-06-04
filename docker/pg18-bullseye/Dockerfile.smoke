@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1.7
+
+ARG BASE_IMAGE=ghcr.io/cloudnative-pg/postgresql:18.4
+ARG EXTENSION_IMAGE
+
+FROM ${EXTENSION_IMAGE} AS extension
+
+FROM ${BASE_IMAGE} AS smoke
+ARG PG_MAJOR=18
+
+USER root
+
+COPY --from=extension /share/extension/rum* /usr/share/postgresql/${PG_MAJOR}/extension/
+COPY --from=extension /lib/rum.so /usr/lib/postgresql/${PG_MAJOR}/lib/rum.so
+
+RUN set -eux; \
+    test -f "/usr/share/postgresql/${PG_MAJOR}/extension/rum.control"; \
+    test -f "/usr/lib/postgresql/${PG_MAJOR}/lib/rum.so"; \
+    chmod 0644 "/usr/share/postgresql/${PG_MAJOR}/extension"/rum*; \
+    chmod 0755 "/usr/lib/postgresql/${PG_MAJOR}/lib/rum.so"
+
+USER postgres
+
+ENV PGDATA=/tmp/rum-smoke-data
+ENV PGHOST=/tmp/rum-smoke-run
+ENV PATH="/usr/lib/postgresql/${PG_MAJOR}/bin:${PATH}"
+
+RUN set -eux; \
+    mkdir -p "$PGDATA" "$PGHOST"; \
+    initdb -D "$PGDATA" --no-locale --encoding=UTF8; \
+    pg_ctl -D "$PGDATA" -o "-k $PGHOST -h '' -c listen_addresses=''" -w start; \
+    psql -v ON_ERROR_STOP=1 -d postgres \
+      -c "CREATE EXTENSION rum;" \
+      -c "SELECT extname, extversion FROM pg_extension WHERE extname = 'rum';" \
+      -c "CREATE TABLE rum_smoke (id bigint generated always as identity primary key, summary tsvector);" \
+      -c "CREATE INDEX rum_smoke_summary_rum ON rum_smoke USING rum (summary rum_tsvector_ops);"; \
+    pg_ctl -D "$PGDATA" -m fast -w stop; \
+    rm -rf "$PGDATA" "$PGHOST"
