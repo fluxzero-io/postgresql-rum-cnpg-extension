@@ -1,0 +1,44 @@
+name: Check RUM package
+
+on:
+  schedule:
+    - cron: "20 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: check-rum-package
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check PGDG package metadata
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check PGDG package metadata
+        run: ./scripts/check-rum-package.sh versions/pg18-bullseye.env
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY }}
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: deps/update-rum-package
+          title: "deps: update PostgreSQL RUM package"
+          commit-message: "deps: update PostgreSQL RUM package"
+          labels: |
+            dependencies
+            postgresql-rum
+          delete-branch: true

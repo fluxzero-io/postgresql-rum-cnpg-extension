@@ -1,0 +1,49 @@
+name: Dependabot auto-merge
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    name: Enable safe Dependabot auto-merge
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY }}
+
+      - name: Approve and enable auto-merge
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PACKAGE_ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          case "${PACKAGE_ECOSYSTEM}" in
+            docker|github-actions|github_actions)
+              ;;
+            *)
+              echo "Skipping Dependabot ecosystem ${PACKAGE_ECOSYSTEM}"
+              exit 0
+              ;;
+          esac
+          gh pr review --approve "${PR_URL}"
+          gh pr merge --auto --squash "${PR_URL}"
