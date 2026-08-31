@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Check PGDG package metadata
         run: ./scripts/check-rum-package.sh versions/pg18-bullseye.env
