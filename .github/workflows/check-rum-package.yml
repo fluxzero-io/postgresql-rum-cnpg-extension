@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
 
 concurrency:
   group: check-rum-package
@@ -19,20 +19,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check PGDG package metadata
         run: ./scripts/check-rum-package.sh versions/pg18-bullseye.env
 
       - name: Create GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_CLIENT_ID }}
+          # Scheduled runs use the retained fluxzero-bot Actions credentials.
+          client-id: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_CLIENT_ID }}
           private-key: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
 
       - name: Create pull request
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ steps.app-token.outputs.token }}
           branch: deps/update-rum-package
@@ -42,3 +45,4 @@ jobs:
             dependencies
             postgresql-rum
           delete-branch: true
+          add-paths: versions/pg18-bullseye.env

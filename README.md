@@ -23,17 +23,19 @@ PostgreSQL needs to load RUM:
 
 The files are installed from the PGDG Debian package in a build stage based on
 the same CloudNativePG PostgreSQL image used by the target cluster. The package
-version and SHA256 are pinned in `versions/pg18-bullseye.env`, and the
-Dockerfile verifies the downloaded `.deb` before installing it.
+version and SHA256 are pinned in `versions/pg18-bullseye.env`. The base image
+is pinned directly in the production Dockerfile so Dependabot can read and update
+it; scripts derive the PostgreSQL version from that pin through `scripts/load-target.sh`.
+The Dockerfile verifies the downloaded `.deb` before installing it.
 
 Current target:
 
 ```text
 PostgreSQL major: 18
-PostgreSQL version: 18.4
+PostgreSQL version: 18.6
 Distribution: Debian Bullseye
 Platform: linux/amd64
-Base image: ghcr.io/cloudnative-pg/postgresql:18.4
+Base image: ghcr.io/cloudnative-pg/postgresql:18.6
 PGDG package: postgresql-18-rum=1.3.15-1.pgdg11+2
 PGDG package SHA256: 3e87fd7b451489b265e291e4d202a51102b3ec0609172a10391c863fd501982e
 ```
@@ -98,7 +100,7 @@ ghcr.io/fluxzero-io/postgresql-rum-cnpg-extension:1.3.15-pgdg11.2-pg18-bullseye@
 Requirements:
 
 - Docker with Buildx
-- Access to `ghcr.io/cloudnative-pg/postgresql:18.4`
+- Access to `ghcr.io/cloudnative-pg/postgresql:18.6`
 - `linux/amd64` build support, usually via Buildx/QEMU on non-amd64 machines
 
 Run the full local smoke test:
@@ -180,9 +182,32 @@ DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY
 
 `dependabot-auto-merge.yml`
 
-Uses the same GitHub App token pattern to approve and enable auto-merge for
-Dependabot PRs from the Docker and GitHub Actions ecosystems once required
-checks pass.
+Uses the separate Fluxzero Dependabot App via Dependabot secrets. The job checks
+both bot actor and PR author, executes no PR code, and requests only Contents/PR
+write for this repository. Verified patch/minor updates use native rebase
+auto-merge behind strict required `Build and smoke test`; majors need a separate
+assessment. The scheduled package watcher retains the existing fluxzero-bot
+Actions credentials with the same names and a similarly bounded token. Do not
+replace those Actions registrations when changing Dependabot credentials.
+
+## Archived Bullseye target
+
+PGDG ended Bullseye updates on 31 August 2026 and moved its packages to the
+[official archive](https://www.postgresql.org/message-id/apWm8-epjef2xpkM%40msg.df7cb.de).
+`docker/pg18-bullseye/configure-pgdg.sh` makes both the build and package checker
+use that archive, retaining APT signature verification and the package checksum.
+RUM 1.3.15 remains the final available package for this target. A successful
+archive check proves reproducibility, not continuing security updates.
+
+Keep this target compatible with existing Bullseye PostgreSQL 18 consumers.
+A supported Debian target needs its own directory/version file and coordinated
+downstream qualification; do not relabel a Bookworm/Trixie build as Bullseye.
+Docker major upgrades are excluded; the scripts reject another PostgreSQL major
+and the archive setup rejects another distro. Image publication does not update
+the downstream database configuration.
+
+For a downstream compatibility check, `SMOKE_BASE_IMAGE` can select the existing
+PostgreSQL 18 consumer image while testing the built extension image.
 
 ## Consuming The Image
 

@@ -1,22 +1,23 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 
-ARG BASE_IMAGE=ghcr.io/cloudnative-pg/postgresql:18.4
 ARG PG_MAJOR=18
-ARG PG_VERSION=18.4
+ARG PG_VERSION
 ARG PG_DISTRO=bullseye
 ARG RUM_PACKAGE=postgresql-18-rum
 ARG RUM_PACKAGE_VERSION
 ARG RUM_PACKAGE_SHA256
 
-FROM ${BASE_IMAGE} AS build
+FROM ghcr.io/cloudnative-pg/postgresql:18.6 AS build
 ARG PG_MAJOR
 ARG RUM_PACKAGE
 ARG RUM_PACKAGE_VERSION
 ARG RUM_PACKAGE_SHA256
 
 USER root
+COPY configure-pgdg.sh /tmp/configure-pgdg.sh
 
 RUN set -eux; \
+    sh /tmp/configure-pgdg.sh; \
     test -n "${RUM_PACKAGE_VERSION}"; \
     test -n "${RUM_PACKAGE_SHA256}"; \
     apt-get update; \

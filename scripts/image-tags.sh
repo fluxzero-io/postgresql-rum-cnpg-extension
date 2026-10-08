@@ -11,7 +11,7 @@ if [[ "${version_file}" != /* ]]; then
 fi
 
 # shellcheck disable=SC1090
-source "${version_file}"
+source "${repo_root}/scripts/load-target.sh"
 
 : "${PG_MAJOR:?}"
 : "${PG_DISTRO:?}"

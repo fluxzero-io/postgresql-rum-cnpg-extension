@@ -26,19 +26,20 @@ read-only image volume into the Postgres pod.
 
 The only implemented target is `pg18-bullseye`.
 
-Source of truth:
+Sources of truth:
 
-```text
-versions/pg18-bullseye.env
-```
+- `versions/pg18-bullseye.env`: PostgreSQL major/distro and RUM package/checksum.
+- `docker/pg18-bullseye/Dockerfile` literal build-stage FROM: base image pin.
+- `scripts/load-target.sh`: derives BASE_IMAGE and PG_VERSION for all callers.
+
+Do not reintroduce a duplicate base-image/version pin in the env file; Dependabot
+must be able to read and update the actual production FROM.
 
 Current values:
 
 ```text
 PG_MAJOR=18
-PG_VERSION=18.4
 PG_DISTRO=bullseye
-BASE_IMAGE=ghcr.io/cloudnative-pg/postgresql:18.4
 RUM_PACKAGE=postgresql-18-rum
 RUM_PACKAGE_VERSION=1.3.15-1.pgdg11+2
 RUM_UPSTREAM_VERSION=1.3.15
@@ -187,8 +188,12 @@ workflow.
 
 `dependabot-auto-merge.yml`
 
-Uses `dependabot/fetch-metadata` and a GitHub App token to approve and enable
-auto-merge for Dependabot PRs from Docker and GitHub Actions ecosystems.
+Uses verified metadata and the separate Fluxzero Dependabot App to enable native
+rebase auto-merge for patch/minor PRs behind strict `Build and smoke test`.
+The job checks actor, author and same-repo scope and executes no PR code.
+The scheduled package watcher uses the retained fluxzero-bot Actions secrets,
+not the separate Dependabot credentials. Both tokens are explicitly limited to
+Contents/PR-write for this repository.
 
 Expected secrets:
 
@@ -196,6 +201,15 @@ Expected secrets:
 DEPENDABOT_AUTOMERGE_APP_CLIENT_ID
 DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY
 ```
+
+## Archived Target
+
+Bullseye's PGDG packages are frozen in the official archive after EOL. Shared
+`docker/pg18-bullseye/configure-pgdg.sh` prepares the source in both the Docker
+build and package check, preserving signatures and SHA256 verification. A green
+check is not evidence of ongoing security updates. Read the archived-target
+section in README before changing this target. A supported distro is a new
+coordinated target; preserve existing Bullseye consumers until qualified.
 
 ## Downstream Context
 

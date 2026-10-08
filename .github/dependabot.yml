@@ -5,6 +5,10 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 10
+    groups:
+      github-actions-patch-and-minor:
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
     commit-message:
       prefix: "deps"
 
@@ -13,5 +17,13 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 10
+    # This target is PostgreSQL 18 / Bullseye; new majors require a new target.
+    ignore:
+      - dependency-name: "cloudnative-pg/postgresql"
+        update-types: ["version-update:semver-major"]
+    groups:
+      docker-patch-and-minor:
+        patterns: ["*"]
+        update-types: ["patch", "minor"]
     commit-message:
       prefix: "deps"

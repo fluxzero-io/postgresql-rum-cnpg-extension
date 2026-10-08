@@ -10,7 +10,7 @@ if [[ "${version_file}" != /* ]]; then
 fi
 
 # shellcheck disable=SC1090
-source "${version_file}"
+source "${repo_root}/scripts/load-target.sh"
 
 platform="${PLATFORM:-linux/amd64}"
 immutable_tag="$("${script_dir}/image-tags.sh" "${version_file}" immutable-tag)"
@@ -21,7 +21,6 @@ printf 'Building extension image %s for %s\n' "${local_image}" "${platform}"
 docker buildx build \
   --platform "${platform}" \
   --load \
-  --build-arg "BASE_IMAGE=${BASE_IMAGE}" \
   --build-arg "PG_MAJOR=${PG_MAJOR}" \
   --build-arg "PG_VERSION=${PG_VERSION}" \
   --build-arg "PG_DISTRO=${PG_DISTRO}" \

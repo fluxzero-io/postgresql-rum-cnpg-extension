@@ -10,7 +10,7 @@ if [[ "${version_file}" != /* ]]; then
 fi
 
 # shellcheck disable=SC1090
-source "${version_file}"
+source "${repo_root}/scripts/load-target.sh"
 
 : "${BASE_IMAGE:?}"
 : "${RUM_PACKAGE:?}"
@@ -18,7 +18,10 @@ source "${version_file}"
 platform="${PLATFORM:-linux/amd64}"
 
 metadata="$(
-  docker run --rm --platform "${platform}" --user root --env "RUM_PACKAGE=${RUM_PACKAGE}" "${BASE_IMAGE}" sh -eu -c '
+  docker run --rm --platform "${platform}" --user root \
+    --mount "type=bind,source=${repo_root}/docker/pg18-bullseye/configure-pgdg.sh,target=/tmp/configure-pgdg.sh,readonly" \
+    --env "RUM_PACKAGE=${RUM_PACKAGE}" "${BASE_IMAGE}" sh -eu -c '
+    sh /tmp/configure-pgdg.sh
     apt-get update >/dev/null
     candidate="$(apt-cache policy "${RUM_PACKAGE}" | awk "/Candidate:/ {print \$2; exit}")"
     test -n "${candidate}"
