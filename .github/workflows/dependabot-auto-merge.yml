@@ -1,49 +1,90 @@
-name: Dependabot auto-merge
+name: Dependabot Auto-Merge
 
 on:
-  pull_request_target:
-    types:
-      - opened
-      - synchronize
-      - reopened
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+
+concurrency:
+  group: dependabot-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
 
 jobs:
-  automerge:
-    name: Enable safe Dependabot auto-merge
-    if: github.actor == 'dependabot[bot]'
+  auto-merge:
+    name: Enable Dependabot auto-merge
+    if: >-
+      github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Fetch Dependabot metadata
+      # This workflow never checks out or executes pull-request code.
+      # The merge App credentials come from the existing Dependabot secrets.
+      - name: Fetch verified Dependabot metadata
         id: metadata
-        uses: dependabot/fetch-metadata@v3
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ github.token }}
 
-      - name: Create GitHub App token
+      - name: Require the merge App configuration
+        env:
+          APP_CLIENT_ID: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY }}
+        run: |
+          test -n "$APP_CLIENT_ID" && test -n "$APP_PRIVATE_KEY" || {
+            echo '::error::Configure the existing Dependabot Automerge App for this repository.'
+            exit 1
+          }
+
+      - name: Create bounded merge App token
         id: app-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
-          app-id: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_CLIENT_ID }}
+          client-id: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_CLIENT_ID }}
           private-key: ${{ secrets.DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
 
-      - name: Approve and enable auto-merge
+      - name: Enable native auto-merge behind required CI
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PACKAGE_ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
+          READ_TOKEN: ${{ github.token }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
           PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          REQUIRED_CHECKS: '["Build and smoke test"]'
         run: |
           set -euo pipefail
-          case "${PACKAGE_ECOSYSTEM}" in
-            docker|github-actions|github_actions)
-              ;;
+          case "$UPDATE_TYPE" in
+            version-update:semver-patch|version-update:semver-minor) ;;
             *)
-              echo "Skipping Dependabot ecosystem ${PACKAGE_ECOSYSTEM}"
+              auto_merge="$(gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest != null')"
+              if [[ "$auto_merge" == true ]]; then
+                gh pr merge "$PR_URL" --disable-auto
+              fi
+              echo "Leaving $UPDATE_TYPE for separate assessment."
               exit 0
               ;;
           esac
-          gh pr review --approve "${PR_URL}"
-          gh pr merge --auto --squash "${PR_URL}"
+
+          # Refuse immediate merging when the required-check ruleset is absent.
+          rules="$(GH_TOKEN="$READ_TOKEN" gh api "repos/${GITHUB_REPOSITORY}/rules/branches/${BASE_REF}")"
+          jq -e --argjson required "$REQUIRED_CHECKS" '
+            [ .[] | select(.type == "required_status_checks" and .parameters.strict_required_status_checks_policy == true)
+              | .parameters.required_status_checks[] | select(.integration_id == 15368) | .context ] as $configured
+            | ($required | length > 0) and all($required[]; . as $check | $configured | index($check) != null)
+          ' <<< "$rules" > /dev/null || {
+            echo '::error::Activate the matching required CI ruleset before enabling dependency merges.'
+            exit 1
+          }
+
+          # The App, rather than GITHUB_TOKEN, makes the eventual merge. Its push
+          # starts the existing main CI/release workflows; strict CI rules gate it.
+          gh pr merge "$PR_URL" --auto --rebase --match-head-commit "$PR_HEAD_SHA"
