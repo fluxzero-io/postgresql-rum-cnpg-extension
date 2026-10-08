@@ -195,12 +195,11 @@ The scheduled package watcher uses the retained fluxzero-bot Actions secrets,
 not the separate Dependabot credentials. Both tokens are explicitly limited to
 Contents/PR-write for this repository.
 
-Expected secrets:
-
-```text
-DEPENDABOT_AUTOMERGE_APP_CLIENT_ID
-DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY
-```
+Expected Dependabot secrets: `DEPENDABOT_AUTOMERGE_APP_CLIENT_ID` and
+`DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY`. Expected Actions secrets for the watcher:
+`FLUXZERO_BOT_CLIENT_ID` and `FLUXZERO_BOT_PRIVATE_KEY`. The watcher needs this
+repository selected in both the release-App installation and each Actions
+secret selection. Do not copy the separate Dependabot key into Actions.
 
 ## Archived Target
 
