@@ -173,11 +173,11 @@ request.
 
 The package watcher uses a GitHub App token instead of the default
 `GITHUB_TOKEN`, so the generated pull request can trigger the normal pull
-request workflow. The expected secrets are:
+request workflow. The expected Actions secrets for the selected release-App installation are:
 
 ```text
-DEPENDABOT_AUTOMERGE_APP_CLIENT_ID
-DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY
+FLUXZERO_BOT_CLIENT_ID
+FLUXZERO_BOT_PRIVATE_KEY
 ```
 
 `dependabot-auto-merge.yml`
@@ -187,8 +187,10 @@ both bot actor and PR author, executes no PR code, and requests only Contents/PR
 write for this repository. Verified patch/minor updates use native rebase
 auto-merge behind strict required `Build and smoke test`; majors need a separate
 assessment. The scheduled package watcher retains the existing fluxzero-bot
-Actions credentials with the same names and a similarly bounded token. Do not
-replace those Actions registrations when changing Dependabot credentials.
+Actions credentials (`FLUXZERO_BOT_CLIENT_ID` / `FLUXZERO_BOT_PRIVATE_KEY`)
+and a similarly bounded token. The merge job uses only
+`DEPENDABOT_AUTOMERGE_APP_CLIENT_ID` / `DEPENDABOT_AUTOMERGE_APP_PRIVATE_KEY`
+from the Dependabot secret category. Keep the two credential families separate.
 
 ## Archived Bullseye target
 
