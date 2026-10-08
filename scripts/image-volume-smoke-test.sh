@@ -12,7 +12,7 @@ if [[ "${version_file}" != /* ]]; then
 fi
 
 # shellcheck disable=SC1090
-source "${version_file}"
+source "${repo_root}/scripts/load-target.sh"
 
 platform="${PLATFORM:-linux/amd64}"
 extension_name="${EXTENSION_NAME:-rum}"
@@ -26,7 +26,7 @@ docker run --rm -i \
   --user postgres \
   --env "PG_MAJOR=${PG_MAJOR}" \
   --env "EXTENSION_ROOT=${extension_root}" \
-  "${BASE_IMAGE}" \
+  "${SMOKE_BASE_IMAGE:-${BASE_IMAGE}}" \
   sh -s <<'CONTAINER_SCRIPT'
 set -eux
 
