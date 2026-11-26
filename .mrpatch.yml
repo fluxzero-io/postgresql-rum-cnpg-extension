@@ -1,0 +1,13 @@
+version: 1
+defaults:
+  schedule:
+    cron: 0 * * * *
+    spread: 55m
+  ecosystems:
+  - github-actions
+  - package-ecosystem: docker
+    directory: /docker/pg18-bullseye
+    ignore:
+    - dependency-name: cloudnative-pg/postgresql
+      update-types:
+      - version-update:semver-major
